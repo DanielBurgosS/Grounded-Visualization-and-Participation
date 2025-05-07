@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Map with Persistent Thread Feature</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map { 
+      height: 100vh;
+      width: 100%;
+    }
+    .comment-form textarea {
+      width: 220px;
+      height: 80px;
+      margin-bottom: 8px;
+    }
+    .comment-form button {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .comment-list {
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 10px;
+      border-top: 1px solid #ccc;
+      padding-top: 5px;
+    }
+    .comment-item {
+      margin-bottom: 8px;
+      padding: 5px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+    }
+    .comment-user {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .comment-text {
+      margin: 0;
+    }
+    .reaction-buttons {
+      margin-top: 5px;
+      display: flex;
+      gap: 10px;
+    }
+    .reaction-btn {
+      display: inline-flex;
+      align-items: center;
+      border: none;
+      background: #f0f0f0;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .reaction-btn:hover {
+      background: #e0e0e0;
+    }
+    .reaction-count {
+      margin-left: 5px;
+      font-weight: bold;
+    }
+    .map-controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    select {
+      padding: 5px;
+      width: 160px;
+    }
+  </style>
+</head>
+<body>
+  <div class="map-controls">
+    <select id="map-style">
+      <option value="osm">OpenStreetMap</option>
+      <option value="topo">OpenTopoMap</option>
+      <option value="carto">CartoDB Positron</option>
+      <option value="toner">Stamen Toner</option>
+      <option value="satellite">Esri Satellite</option>
+    </select>
+  </div>
+  
+  <div id="map"></div>
+  
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Initialize the map
+    const map = L.map('map').setView([52.263, 6.155], 16);
+    
+    // Define tile layers with correct URLs
+    let tileLayers = {
+      'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }),
+      'topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap contributors'
+      }),
+      'carto': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap & CartoDB'
+      }),
+      'toner': L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.png', {
+        attribution: 'Map tiles by Stamen Design, CC BY 3.0 — Map data © OpenStreetMap',
+        subdomains: 'abcd'
+      }),
+      'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri'
+      })
+    };
+
+    // Add the default layer
+    let currentLayer = tileLayers['osm'];
+    currentLayer.addTo(map);
+
+    // Handle map style dropdown change
+    document.getElementById('map-style').addEventListener('change', function(e) {
+      map.removeLayer(currentLayer);
+      const selected = e.target.value;
+      currentLayer = tileLayers[selected];
+      currentLayer.addTo(map);
+    });
+    
+    // Store for all markers and their comments
+    const markersData = {};
+    let currentMarkerId = 1;
+    let userCounter = 1;
+    
+    // Function to generate unique marker IDs
+    function generateMarkerId() {
+      return `marker_${currentMarkerId++}`;
+    }
+    
+    // Handle likes and dislikes for a comment
+    function handleReaction(markerId, commentIndex, reactionType, event) {
+      // Prevent event propagation
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      const comments = markersData[markerId].comments;
+      
+      // Initialize reaction counts if they don't exist
+      if (!comments[commentIndex].reactions) {
+        comments[commentIndex].reactions = { likes: 0, dislikes: 0 };
+      }
+      
+      // Increment the appropriate counter
+      comments[commentIndex].reactions[reactionType]++;
+      
+      // Update the popup to show new reaction counts
+      const marker = markersData[markerId].marker;
+      const popup = marker.getPopup();
+      popup.setContent(createPopupContent(markerId));
+      
+      return false;
+    }
+    
+    // Function to create a new comment
+    function createComment(markerId, text) {
+      if (!markersData[markerId].comments) {
+        markersData[markerId].comments = [];
+      }
+      
+      // Add the new comment with a user identifier and empty reactions
+      markersData[markerId].comments.push({
+        user: `User ${userCounter++}`,
+        text: text,
+        timestamp: new Date().toLocaleString(),
+        reactions: { likes: 0, dislikes: 0 }
+      });
+      
+      // Update the popup content to show all comments
+      const marker = markersData[markerId].marker;
+      const popup = marker.getPopup();
+      popup.setContent(createPopupContent(markerId));
+    }
+    
+    // Function to generate popup content including form and existing comments
+    function createPopupContent(markerId) {
+      const markerData = markersData[markerId];
+      const comments = markerData.comments || [];
+      
+      let commentsHtml = '';
+      if (comments.length > 0) {
+        commentsHtml = '<div class="comment-list">';
+        comments.forEach((comment, index) => {
+          // Get reaction counts with default values if not set
+          const reactions = comment.reactions || { likes: 0, dislikes: 0 };
+          
+          commentsHtml += `
+            <div class="comment-item">
+              <div class="comment-user">${comment.user} - ${comment.timestamp}</div>
+              <p class="comment-text">${comment.text}</p>
+              <div class="reaction-buttons">
+                <button class="reaction-btn" onclick="handleReaction('${markerId}', ${index}, 'likes', event)">
+                  👍 <span class="reaction-count">${reactions.likes}</span>
+                </button>
+                <button class="reaction-btn" onclick="handleReaction('${markerId}', ${index}, 'dislikes', event)">
+                  👎 <span class="reaction-count">${reactions.dislikes}</span>
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        commentsHtml += '</div>';
+      }
+      
+      return `
+        <div class="comment-form">
+          <strong>Thread at ${markerData.lat.toFixed(4)}, ${markerData.lng.toFixed(4)}</strong><br>
+          <textarea id="comment-${markerId}" placeholder="Type your comment..."></textarea><br>
+          <button onclick="submitComment('${markerId}', event)">Submit Comment</button>
+        </div>
+        ${commentsHtml}
+      `;
+    }
+    
+    // Global function to submit a comment (needs to be accessible from inline onclick)
+    window.submitComment = function(markerId, event) {
+      // Prevent any events from bubbling up
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      const textarea = document.getElementById(`comment-${markerId}`);
+      const text = textarea.value.trim();
+
+      if (text) {
+        createComment(markerId, text);
+        textarea.value = ''; // Clear the input
+      }
+      
+      return false; // Prevent default behavior
+    };
+    
+    // Make reaction handler globally accessible
+    window.handleReaction = handleReaction;
+    
+    // Handle map clicks to create new markers with comment threads
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      
+      // Create a new marker ID
+      const markerId = generateMarkerId();
+      
+      // Create a marker and add it to the map
+      const marker = L.marker([lat, lng]).addTo(map);
+      
+      // Store marker data
+      markersData[markerId] = {
+        marker: marker,
+        lat: lat,
+        lng: lng,
+        comments: []
+      };
+      
+      // Create popup with comment form
+      marker.bindPopup(createPopupContent(markerId));
+      marker.openPopup();
+    });
+  </script>
+</body>
+</html>
