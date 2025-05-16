@@ -166,6 +166,7 @@
   <script>
     // Backend API base URL
     const API_BASE = 'http://smatiiihost.ddns.net/api';
+    const API_KEY = 'fsr4awr048tsa5^aEF_asds!s'; // Change this to something secure!
 
     
     // Initialize the map
@@ -281,7 +282,9 @@
 
     // On page load, fetch all threads and add markers
     async function loadThreads() {
-      const res = await fetch(`${API_BASE}/threads`);
+      const res = await fetch(`${API_BASE}/threads`, {
+        headers: { 'x-api-key': API_KEY }
+      });
       const threads = await res.json();
       renderSidebar(threads);
       threads.forEach(thread => {
@@ -376,7 +379,7 @@
         body: JSON.stringify({ thread_id: thread.id, user, text, timestamp })
       });
       // Fetch updated thread with comments
-      const threadsRes = await fetch(`${API_BASE}/threads`);
+      const threadsRes = await fetch(`${API_BASE}/threads`, { headers: { 'x-api-key': API_KEY } });
       const threads = await threadsRes.json();
       const updatedThread = threads.find(t => t.id === thread.id);
       addThreadMarker(updatedThread);
@@ -403,7 +406,7 @@
           body: JSON.stringify({ thread_id: threadId, user, text, timestamp })
         });
         // Refresh marker popup
-        const threadsRes = await fetch(`${API_BASE}/threads`);
+        const threadsRes = await fetch(`${API_BASE}/threads`, { headers: { 'x-api-key': API_KEY } });
         const threads = await threadsRes.json();
         const updatedThread = threads.find(t => t.id === threadId);
         if (updatedThread && markersById[threadId]) {
@@ -417,7 +420,7 @@
     // Handle deleting a thread
     async function deleteThread(threadId) {
       if (!confirm('Delete this thread?')) return;
-      await fetch(`${API_BASE}/threads/${threadId}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}/threads/${threadId}`, { method: 'DELETE', headers: { 'x-api-key': API_KEY } });
       if (markersById[threadId]) {
         map.removeLayer(markersById[threadId]);
         delete markersById[threadId];
@@ -439,7 +442,7 @@
         body: JSON.stringify({ comment_id: commentId, type })
       });
       // Refresh marker popup
-      const threadsRes = await fetch(`${API_BASE}/threads`);
+      const threadsRes = await fetch(`${API_BASE}/threads`, { headers: { 'x-api-key': API_KEY } });
       const threads = await threadsRes.json();
       const updatedThread = threads.find(t => t.id === threadId);
       if (updatedThread && markersById[threadId]) {
