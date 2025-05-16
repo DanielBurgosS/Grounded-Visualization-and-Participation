@@ -166,7 +166,6 @@
   <script>
     // Backend API base URL
     const API_BASE = 'http://smatiiihost.ddns.net/api';
-    const API_KEY = 'fsr4awr048tsa5^aEF_asds!s'; // Change this to something secure!
 
     
     // Initialize the map
@@ -364,7 +363,7 @@
       // Create thread
       const res = await fetch(`${API_BASE}/threads`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({ lat: Number(lat), lng: Number(lng) })
       });
       const thread = await res.json();
@@ -373,7 +372,7 @@
       const timestamp = new Date().toLocaleString();
       await fetch(`${API_BASE}/comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({ thread_id: thread.id, user, text, timestamp })
       });
       // Fetch updated thread with comments
@@ -400,7 +399,7 @@
         const timestamp = new Date().toLocaleString();
         await fetch(`${API_BASE}/comments`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
           body: JSON.stringify({ thread_id: threadId, user, text, timestamp })
         });
         // Refresh marker popup
@@ -436,7 +435,7 @@
       }
       await fetch(`${API_BASE}/reaction`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
         body: JSON.stringify({ comment_id: commentId, type })
       });
       // Refresh marker popup

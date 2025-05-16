@@ -6,10 +6,21 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const API_KEY = 'fsr4awr048tsa5^aEF_asds!s'; // Change this to your secret key
+
 db.initDB();
 
 app.get('/', (req,res) => {
-  res.sendFile('/home/alex/Project3s/3S/Prototype.html');
+  res.sendFile(path.join(__dirname, 'Prototype.html'));
+});
+
+// API key middleware (protects all routes below)
+app.use((req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey !== API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid API Key' });
+  }
+  next();
 });
 
 app.use(cors());
