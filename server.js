@@ -8,6 +8,9 @@ const PORT = process.env.PORT || 3000;
 
 db.initDB();
 
+app.get('/', (req, res) => {
+  res.sendFile(join('/home/alex/Project3s/3S/Prototype.html'));
+});
 app.use(cors());
 app.use(express.json());
 
