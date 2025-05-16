@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const db = require('./db');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,17 +11,9 @@ db.initDB();
 app.use(cors());
 app.use(express.json());
 
-/*app.get('/', (req, res) => {
-  res.sendFile(path.join('/home/alex/Project3s/3S', 'Prototype.html'));
-});
-*/
 app.use((req, res, next) => {
   console.log('Received request:', req.method, req.url);
   next();
-});
-
-app.get('/', (req,res) => {
-  res.sendFile('/home/alex/Project3s/3S/Prototype.html');
 });
 
 // Get all threads with comments
@@ -82,4 +74,6 @@ app.delete('/api/threads/:id', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});
+
+const API_BASE = '/api'; 
