@@ -17,6 +17,69 @@
       height: 100vh;
       width: 100%;
     }
+    #sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 340px;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+      z-index: 2000;
+      overflow-y: auto;
+      transition: transform 0.3s;
+      transform: translateX(0);
+      border-left: 1px solid #ddd;
+      padding: 0 0 0 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #sidebar.collapsed {
+      transform: translateX(100%);
+    }
+    #sidebar-toggle {
+      position: fixed;
+      top: 20px;
+      right: 0px;
+      z-index: 2100;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px 0 0 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 18px;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+      transition: right 0.3s;
+    }
+    .sidebar-thread {
+      border-bottom: 1px solid #eee;
+      padding: 12px 16px 8px 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .sidebar-thread:hover {
+      background: #f7f7f7;
+    }
+    .sidebar-thread-title {
+      font-weight: bold;
+      font-size: 15px;
+      margin-bottom: 2px;
+    }
+    .sidebar-thread-id {
+      color: #888;
+      font-size: 12px;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .sidebar-comment-list {
+      margin-left: 8px;
+      margin-bottom: 6px;
+    }
+    .sidebar-comment-item {
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: #444;
+    }
     .comment-form textarea {
       width: 220px;
       height: 80px;
@@ -85,6 +148,8 @@
   </style>
 </head>
 <body>
+  <div id="sidebar" class="collapsed"></div>
+  <button id="sidebar-toggle">⮞</button>
   <div class="map-controls">
     <select id="map-style">
       <option value="osm">OpenStreetMap</option>
@@ -99,6 +164,9 @@
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
+    // Backend API base URL
+    const API_BASE = 'http://localhost:3001/api';
+
     // Initialize the map
     const map = L.map('map').setView([52.263, 6.155], 16);
     
@@ -133,85 +201,63 @@
       currentLayer = tileLayers[selected];
       currentLayer.addTo(map);
     });
-    
-    // Store for all markers and their comments
-    const markersData = {};
-    let currentMarkerId = 1;
+
+    // Store for all markers by thread id
+    const markersById = {};
     let userCounter = 1;
-    
-    // Function to generate unique marker IDs
-    function generateMarkerId() {
-      return `marker_${currentMarkerId++}`;
-    }
-    
-    // Handle likes and dislikes for a comment
-    function handleReaction(markerId, commentIndex, reactionType, event) {
-      // Prevent event propagation
-      if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-      
-      const comments = markersData[markerId].comments;
-      
-      // Initialize reaction counts if they don't exist
-      if (!comments[commentIndex].reactions) {
-        comments[commentIndex].reactions = { likes: 0, dislikes: 0 };
-      }
-      
-      // Increment the appropriate counter
-      comments[commentIndex].reactions[reactionType]++;
-      
-      // Update the popup to show new reaction counts
-      const marker = markersData[markerId].marker;
-      const popup = marker.getPopup();
-      popup.setContent(createPopupContent(markerId));
-      
-      return false;
-    }
-    
-    // Function to create a new comment
-    function createComment(markerId, text) {
-      if (!markersData[markerId].comments) {
-        markersData[markerId].comments = [];
-      }
-      
-      // Add the new comment with a user identifier and empty reactions
-      markersData[markerId].comments.push({
-        user: `User ${userCounter++}`,
-        text: text,
-        timestamp: new Date().toLocaleString(),
-        reactions: { likes: 0, dislikes: 0 }
+
+    // Add a marker for a thread
+    function addThreadMarker(thread) {
+      const marker = L.marker([thread.lat, thread.lng]).addTo(map);
+      markersById[thread.id] = marker;
+      marker.bindPopup(createPopupContent(thread), { autoClose: false, closeOnClick: false });
+      let popupHovered = false;
+      let markerHovered = false;
+      marker.on('mouseover', function() {
+        markerHovered = true;
+        marker.openPopup();
       });
-      
-      // Update the popup content to show all comments
-      const marker = markersData[markerId].marker;
-      const popup = marker.getPopup();
-      popup.setContent(createPopupContent(markerId));
+      marker.on('mouseout', function() {
+        markerHovered = false;
+        setTimeout(() => {
+          if (!popupHovered && !markerHovered) {
+            marker.closePopup();
+          }
+        }, 100);
+      });
+      marker.on('popupopen', () => {
+        const popupEl = document.querySelector('.leaflet-popup-content');
+        if (popupEl) {
+          popupEl.addEventListener('mouseenter', () => { popupHovered = true; });
+          popupEl.addEventListener('mouseleave', () => {
+            popupHovered = false;
+            setTimeout(() => {
+              if (!popupHovered && !markerHovered) {
+                marker.closePopup();
+              }
+            }, 100);
+          });
+        }
+        marker.setPopupContent(createPopupContent(thread));
+      });
     }
-    
-    // Function to generate popup content including form and existing comments
-    function createPopupContent(markerId) {
-      const markerData = markersData[markerId];
-      const comments = markerData.comments || [];
-      
+
+    // Create popup content for a thread
+    function createPopupContent(thread) {
       let commentsHtml = '';
-      if (comments.length > 0) {
+      if (thread.comments && thread.comments.length > 0) {
         commentsHtml = '<div class="comment-list">';
-        comments.forEach((comment, index) => {
-          // Get reaction counts with default values if not set
-          const reactions = comment.reactions || { likes: 0, dislikes: 0 };
-          
+        thread.comments.forEach((comment) => {
           commentsHtml += `
             <div class="comment-item">
               <div class="comment-user">${comment.user} - ${comment.timestamp}</div>
               <p class="comment-text">${comment.text}</p>
               <div class="reaction-buttons">
-                <button class="reaction-btn" onclick="handleReaction('${markerId}', ${index}, 'likes', event)">
-                  👍 <span class="reaction-count">${reactions.likes}</span>
+                <button class="reaction-btn" onclick="handleReaction(${comment.id}, 'likes', event, ${thread.id})">
+                  👍 <span class="reaction-count">${comment.likes}</span>
                 </button>
-                <button class="reaction-btn" onclick="handleReaction('${markerId}', ${index}, 'dislikes', event)">
-                  👎 <span class="reaction-count">${reactions.dislikes}</span>
+                <button class="reaction-btn" onclick="handleReaction(${comment.id}, 'dislikes', event, ${thread.id})">
+                  👎 <span class="reaction-count">${comment.dislikes}</span>
                 </button>
               </div>
             </div>
@@ -219,62 +265,213 @@
         });
         commentsHtml += '</div>';
       }
-      
+      // Add Delete button for debugging and show thread ID
       return `
         <div class="comment-form">
-          <strong>Thread at ${markerData.lat.toFixed(4)}, ${markerData.lng.toFixed(4)}</strong><br>
-          <textarea id="comment-${markerId}" placeholder="Type your comment..."></textarea><br>
-          <button onclick="submitComment('${markerId}', event)">Submit Comment</button>
+          <strong>Thread at ${thread.lat.toFixed(4)}, ${thread.lng.toFixed(4)}</strong><br>
+          <span style='color: #888;'>Thread ID: ${thread.id}</span><br>
+          <textarea id="comment-${thread.id}" placeholder="Type your comment..."></textarea><br>
+          <button onclick="submitComment(${thread.id}, event)">Submit Comment</button>
+          <button style='margin-left:10px;color:red;' onclick="deleteThread(${thread.id})">Delete Thread</button>
         </div>
         ${commentsHtml}
       `;
     }
-    
-    // Global function to submit a comment (needs to be accessible from inline onclick)
-    window.submitComment = function(markerId, event) {
-      // Prevent any events from bubbling up
+
+    // On page load, fetch all threads and add markers
+    async function loadThreads() {
+      const res = await fetch(`${API_BASE}/threads`);
+      const threads = await res.json();
+      renderSidebar(threads);
+      threads.forEach(thread => {
+        addThreadMarker(thread);
+      });
+    }
+
+    // Render the sidebar with all threads and comments
+    function renderSidebar(threads) {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.innerHTML = `<div style="font-size:18px;font-weight:bold;padding:16px 16px 8px 16px;border-bottom:1px solid #eee;">Threads</div>`;
+      if (threads.length === 0) {
+        sidebar.innerHTML += `<div style='padding:16px;color:#888;'>No threads yet.</div>`;
+        return;
+      }
+      threads.forEach(thread => {
+        let commentsHtml = '';
+        if (thread.comments && thread.comments.length > 0) {
+          commentsHtml = `<div class='sidebar-comment-list'>`;
+          thread.comments.forEach(comment => {
+            commentsHtml += `<div class='sidebar-comment-item'><b>${comment.user}:</b> ${comment.text}</div>`;
+          });
+          commentsHtml += `</div>`;
+        }
+        sidebar.innerHTML += `
+          <div class='sidebar-thread' data-thread-id='${thread.id}'>
+            <span class='sidebar-thread-title'>Thread at ${thread.lat.toFixed(4)}, ${thread.lng.toFixed(4)}</span><br>
+            <span class='sidebar-thread-id'>ID: ${thread.id}</span>
+            <button class='sidebar-delete-btn' style='float:right;margin-top:-22px;margin-right:-8px;color:red;background:none;border:none;font-size:16px;cursor:pointer;' title='Delete Thread' onclick='event.stopPropagation(); deleteThread(${thread.id});'>&#128465;</button>
+            ${commentsHtml}
+          </div>
+        `;
+      });
+      // Add click handlers to focus/open marker
+      Array.from(document.getElementsByClassName('sidebar-thread')).forEach(el => {
+        el.onclick = function() {
+          const threadId = parseInt(this.getAttribute('data-thread-id'));
+          const marker = markersById[threadId];
+          if (marker) {
+            map.setView(marker.getLatLng(), 17, { animate: true });
+            marker.openPopup();
+          }
+        };
+      });
+    }
+
+    // Sidebar toggle logic
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    function updateSidebarTogglePosition() {
+      if (sidebar.classList.contains('collapsed')) {
+        sidebarToggle.style.right = '0';
+        sidebarToggle.innerText = '⮞';
+      } else {
+        sidebarToggle.style.right = '340px';
+        sidebarToggle.innerText = '⮜';
+      }
+    }
+    sidebarToggle.onclick = function() {
+      if (sidebar.classList.contains('collapsed')) {
+        sidebar.classList.remove('collapsed');
+      } else {
+        sidebar.classList.add('collapsed');
+      }
+      updateSidebarTogglePosition();
+    };
+    // Set initial position (collapsed)
+    updateSidebarTogglePosition();
+
+    // Handle submitting a new thread with first comment
+    window.submitNewThread = async function(lat, lng, event) {
       if (event) {
         event.preventDefault();
         event.stopPropagation();
       }
-      
-      const textarea = document.getElementById(`comment-${markerId}`);
+      const textarea = document.getElementById('temp-comment');
       const text = textarea.value.trim();
+      if (!text) return;
+      // Create thread
+      const res = await fetch(`${API_BASE}/threads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: Number(lat), lng: Number(lng) })
+      });
+      const thread = await res.json();
+      // Add first comment
+      const user = `User ${userCounter++}`;
+      const timestamp = new Date().toLocaleString();
+      await fetch(`${API_BASE}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thread_id: thread.id, user, text, timestamp })
+      });
+      // Fetch updated thread with comments
+      const threadsRes = await fetch(`${API_BASE}/threads`);
+      const threads = await threadsRes.json();
+      const updatedThread = threads.find(t => t.id === thread.id);
+      addThreadMarker(updatedThread);
+      if (tempPopup) {
+        map.closePopup(tempPopup);
+        tempPopup = null;
+      }
+    };
 
+    // Handle submitting a comment to a thread
+    window.submitComment = async function(threadId, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const textarea = document.getElementById(`comment-${threadId}`);
+      const text = textarea.value.trim();
       if (text) {
-        createComment(markerId, text);
-        textarea.value = ''; // Clear the input
+        const user = `User ${userCounter++}`;
+        const timestamp = new Date().toLocaleString();
+        await fetch(`${API_BASE}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ thread_id: threadId, user, text, timestamp })
+        });
+        // Refresh marker popup
+        const threadsRes = await fetch(`${API_BASE}/threads`);
+        const threads = await threadsRes.json();
+        const updatedThread = threads.find(t => t.id === threadId);
+        if (updatedThread && markersById[threadId]) {
+          markersById[threadId].setPopupContent(createPopupContent(updatedThread));
+        }
+        textarea.value = '';
+      }
+      return false;
+    };
+
+    // Handle deleting a thread
+    async function deleteThread(threadId) {
+      if (!confirm('Delete this thread?')) return;
+      await fetch(`${API_BASE}/threads/${threadId}`, { method: 'DELETE' });
+      if (markersById[threadId]) {
+        map.removeLayer(markersById[threadId]);
+        delete markersById[threadId];
       }
       
-      return false; // Prevent default behavior
-    };
-    
-    // Make reaction handler globally accessible
+      loadThreads();
+    }
+    window.deleteThread = deleteThread;
+
+    // Handle like/dislike
+    async function handleReaction(commentId, type, event, threadId) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      await fetch(`${API_BASE}/reaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment_id: commentId, type })
+      });
+      // Refresh marker popup
+      const threadsRes = await fetch(`${API_BASE}/threads`);
+      const threads = await threadsRes.json();
+      const updatedThread = threads.find(t => t.id === threadId);
+      if (updatedThread && markersById[threadId]) {
+        markersById[threadId].setPopupContent(createPopupContent(updatedThread));
+      }
+      return false;
+    }
     window.handleReaction = handleReaction;
-    
-    // Handle map clicks to create new markers with comment threads
+
+    // --- Only create a thread when a comment is submitted ---
+    let tempPopup = null;
     map.on('click', function(e) {
+      if (tempPopup) {
+        map.closePopup(tempPopup);
+        tempPopup = null;
+      }
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
-      
-      // Create a new marker ID
-      const markerId = generateMarkerId();
-      
-      // Create a marker and add it to the map
-      const marker = L.marker([lat, lng]).addTo(map);
-      
-      // Store marker data
-      markersData[markerId] = {
-        marker: marker,
-        lat: lat,
-        lng: lng,
-        comments: []
-      };
-      
-      // Create popup with comment form
-      marker.bindPopup(createPopupContent(markerId));
-      marker.openPopup();
+      const formHtml = `
+        <div class="comment-form">
+          <strong>Start a new thread at ${lat.toFixed(4)}, ${lng.toFixed(4)}</strong><br>
+          <textarea id="temp-comment" placeholder="Type your comment..."></textarea><br>
+          <button onclick="submitNewThread(${lat}, ${lng}, event)">Submit Comment & Create Thread</button>
+        </div>
+      `;
+      tempPopup = L.popup()
+        .setLatLng([lat, lng])
+        .setContent(formHtml)
+        .openOn(map);
     });
+
+    // Load all threads on page load
+    loadThreads();
   </script>
 </body>
 </html>
