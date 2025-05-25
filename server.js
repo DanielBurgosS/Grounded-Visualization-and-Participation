@@ -2,18 +2,65 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./db');
 const path = require('path');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 db.initDB();
 
-app.get('/', (req,res) => {
-  res.sendFile('/home/alex/Project3s/3S/Prototype.html');
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'Prototype.html'));
 });
 
 app.use(cors());
 app.use(express.json());
+
+// Session middleware must come before passport
+app.use(session({
+  secret: 'your_secret_session_key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, sameSite: 'lax' } // Set to true for secure in production
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+//LOG USER
+app.use((req, res, next) => {
+  console.log('Current user:', req.user);
+  next();
+});
+
+passport.use(new GoogleStrategy({
+  clientID: '777120888972-0icvlb4k7nooof55rkk3i2miqnvraiao.apps.googleusercontent.com',
+  clientSecret: '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',
+  callbackURL: 'http://localhost:3000/auth/google/callback'
+}, (accessToken, refreshToken, profile, done) => {
+  db.getUserByGoogleId(profile.id, (err, user) => {
+    if (err) return done(err);
+    if (user) {
+      return done(null, user);
+    } else {
+      db.createUserWithGoogleId(profile.id, (err, newUser) => {
+        if (err) return done(err);
+        return done(null, newUser);
+      });
+    }
+  });
+}));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+passport.deserializeUser((id, done) => {
+  db.getUserById(id, (err, user) => {
+    if (err) return done(err);
+    done(null, user);
+  });
+});
 
 app.use((req, res, next) => {
   console.log('Received request:', req.method, req.url);
@@ -74,6 +121,60 @@ app.delete('/api/threads/:id', (req, res) => {
     if (err) return res.status(500).json({ error: 'Database error' });
     res.json({ success: true });
   });
+});
+
+// Start Google OAuth login
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+// Google OAuth callback
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    // Successful authentication, redirect to your app
+    res.redirect('/');
+  }
+);
+
+// Add a whoami endpoint to return the current user
+app.get('/api/whoami', (req, res) => {
+  res.json({ user: req.user || null });
+});
+
+app.post('/api/set-username', (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Not logged in' });
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ error: 'Username required' });
+  db.setUsernameForUser(req.user.id, username, (err) => {
+    if (err) {
+      if (err.message && err.message.includes('UNIQUE')) {
+        return res.status(409).json({ error: 'Username already taken' });
+      }
+      return res.status(500).json({ error: 'Database error' });
+    }
+    // Update user in session and req.user
+    req.user.username = username;
+    req.session.passport.user = req.user.id;
+    res.json({ success: true, username });
+  });
+});
+
+app.post('/api/logout', (req, res) => {
+  if (req.logout) {
+    req.logout(function(err) {
+      // Ignore error for now, but you could handle it if needed
+      req.session.destroy(() => {
+        res.clearCookie('connect.sid');
+        res.json({ success: true });
+      });
+    });
+  } else {
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.json({ success: true });
+    });
+  }
 });
 
 app.listen(PORT, () => {

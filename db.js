@@ -22,6 +22,11 @@ function initDB() {
       dislikes INTEGER DEFAULT 0,
       FOREIGN KEY(thread_id) REFERENCES threads(id)
     )`);
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      google_id TEXT UNIQUE,
+      username TEXT UNIQUE
+    )`);
   });
 }
 
@@ -81,11 +86,47 @@ function deleteThread(thread_id, callback) {
   });
 }
 
+// Get user by Google ID
+function getUserByGoogleId(google_id, callback) {
+  db.get('SELECT * FROM users WHERE google_id = ?', [google_id], (err, user) => {
+    if (err) return callback(err);
+    callback(null, user);
+  });
+}
+
+// Create user with Google ID
+function createUserWithGoogleId(google_id, callback) {
+  db.run('INSERT INTO users (google_id) VALUES (?)', [google_id], function(err) {
+    if (err) return callback(err);
+    callback(null, { id: this.lastID, google_id });
+  });
+}
+
+// Set username for user
+function setUsernameForUser(user_id, username, callback) {
+  db.run('UPDATE users SET username = ? WHERE id = ?', [username, user_id], function(err) {
+    if (err) return callback(err);
+    callback(null);
+  });
+}
+
+// Get user by ID
+function getUserById(id, callback) {
+  db.get('SELECT * FROM users WHERE id = ?', [id], (err, user) => {
+    if (err) return callback(err);
+    callback(null, user);
+  });
+}
+
 module.exports = {
   initDB,
   getAllThreads,
   addThread,
   addComment,
   updateReaction,
-  deleteThread
+  deleteThread,
+  getUserByGoogleId,
+  createUserWithGoogleId,
+  setUsernameForUser,
+  getUserById
 }; 

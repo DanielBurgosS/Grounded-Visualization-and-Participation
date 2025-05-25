@@ -148,9 +148,13 @@
   </style>
 </head>
 <body>
-  <div id="sidebar" class="collapsed"></div>
-  <button id="sidebar-toggle">⮞</button>
-  <div class="map-controls">
+  <div id="start-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;">
+    <h1>3S Neighbourhood Viewer</h1>
+    <button id="google-login-btn" style="font-size:1.5em;padding:16px 32px;cursor:pointer;">Log in with Google</button>
+  </div>
+  <div id="sidebar" class="collapsed" style="display:none;"></div>
+  <button id="sidebar-toggle" style="display:none;">⮞</button>
+  <div class="map-controls" style="display:none;">
     <select id="map-style">
       <option value="osm">OpenStreetMap</option>
       <option value="topo">OpenTopoMap</option>
@@ -159,8 +163,19 @@
       <option value="satellite">Esri Satellite</option>
     </select>
   </div>
-  
-  <div id="map"></div>
+  <div id="map" style="display:none;"></div>
+  <button id="logout-btn" style="position:fixed;bottom:20px;left:20px;z-index:2100;display:none;">
+    <span id="current-username" style="font-weight:bold;margin-right:12px;"></span>
+    Logout
+  </button>
+  <div id="username-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:3000;align-items:center;justify-content:center;">
+    <div style="background:#fff;padding:32px 24px;border-radius:8px;box-shadow:0 2px 16px rgba(0,0,0,0.2);min-width:300px;display:flex;flex-direction:column;align-items:center;">
+      <h2>Choose a Username</h2>
+      <input id="username-input" type="text" placeholder="Enter username" style="font-size:1.2em;padding:8px;width:90%;margin-bottom:12px;" />
+      <button id="username-submit-btn" style="font-size:1.1em;padding:8px 24px;">Save Username</button>
+      <div id="username-error" style="color:red;margin-top:10px;"></div>
+    </div>
+  </div>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -205,6 +220,7 @@
     // Store for all markers by thread id
     const markersById = {};
     let userCounter = 1;
+    let currentUsername = null;
 
     // Add a marker for a thread
     function addThreadMarker(thread) {
@@ -367,7 +383,7 @@
       });
       const thread = await res.json();
       // Add first comment
-      const user = `User ${userCounter++}`;
+      const user = currentUsername;
       const timestamp = new Date().toLocaleString();
       await fetch(`${API_BASE}/comments`, {
         method: 'POST',
@@ -394,7 +410,7 @@
       const textarea = document.getElementById(`comment-${threadId}`);
       const text = textarea.value.trim();
       if (text) {
-        const user = `User ${userCounter++}`;
+        const user = currentUsername;
         const timestamp = new Date().toLocaleString();
         await fetch(`${API_BASE}/comments`, {
           method: 'POST',
@@ -470,8 +486,98 @@
         .openOn(map);
     });
 
-    // Load all threads on page load
-    loadThreads();
+    // Check login state and show appropriate page
+    async function checkLogin() {
+      try {
+        const res = await fetch('/api/whoami', { credentials: 'include' });
+        const data = await res.json();
+        if (data.user) {
+          if (!data.user.username) {
+            showUsernameModal();
+          } else {
+            currentUsername = data.user.username;
+            showApp();
+          }
+        } else {
+          currentUsername = null;
+          showStartPage();
+        }
+      } catch (e) {
+        currentUsername = null;
+        showStartPage();
+      }
+    }
+
+    function showStartPage() {
+      document.getElementById('start-page').style.display = 'flex';
+      document.getElementById('sidebar').style.display = 'none';
+      document.getElementById('sidebar-toggle').style.display = 'none';
+      document.querySelector('.map-controls').style.display = 'none';
+      document.getElementById('map').style.display = 'none';
+      document.getElementById('logout-btn').style.display = 'none';
+    }
+    function showApp() {
+      document.getElementById('start-page').style.display = 'none';
+      document.getElementById('sidebar').style.display = '';
+      document.getElementById('sidebar-toggle').style.display = '';
+      document.querySelector('.map-controls').style.display = '';
+      document.getElementById('map').style.display = '';
+      document.getElementById('logout-btn').style.display = '';
+      document.getElementById('current-username').innerText = currentUsername ? currentUsername : '';
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 0);
+      loadThreads();
+    }
+
+    document.getElementById('google-login-btn').onclick = function() {
+      window.location.href = '/auth/google';
+    };
+
+    // On page load, check login state
+    checkLogin();
+
+    // Show the username modal
+    function showUsernameModal() {
+      document.getElementById('username-modal').style.display = 'flex';
+      document.getElementById('username-input').value = '';
+      document.getElementById('username-error').innerText = '';
+    }
+
+    // Hide the username modal
+    function hideUsernameModal() {
+      document.getElementById('username-modal').style.display = 'none';
+    }
+
+    // Handle username submission
+    document.getElementById('username-submit-btn').onclick = async function() {
+      const username = document.getElementById('username-input').value.trim();
+      if (!username) {
+        document.getElementById('username-error').innerText = 'Username required';
+        return;
+      }
+      // Save username to backend
+      const res = await fetch('/api/set-username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username })
+      });
+      if (res.ok) {
+        hideUsernameModal();
+        currentUsername = username;
+        showApp();
+      } else {
+        const data = await res.json();
+        document.getElementById('username-error').innerText = data.error || 'Error saving username';
+      }
+    };
+
+    document.getElementById('logout-btn').onclick = async function() {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+      currentUsername = null;
+      window.location.reload();
+    };
   </script>
 </body>
 </html>
