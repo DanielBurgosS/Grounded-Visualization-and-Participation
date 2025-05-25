@@ -37,7 +37,7 @@ app.use((req, res, next) => {
 passport.use(new GoogleStrategy({
   clientID: '777120888972-0icvlb4k7nooof55rkk3i2miqnvraiao.apps.googleusercontent.com',
   clientSecret: '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',
-  callbackURL: 'http://localhost:3000/auth/google/callback'
+  callbackURL: 'https://smatiiihost.ddns.net/auth/google/callback'
 }, (accessToken, refreshToken, profile, done) => {
   db.getUserByGoogleId(profile.id, (err, user) => {
     if (err) return done(err);
