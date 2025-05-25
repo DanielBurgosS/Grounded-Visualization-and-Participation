@@ -25,7 +25,8 @@ function initDB() {
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       google_id TEXT UNIQUE,
-      username TEXT UNIQUE
+      username TEXT UNIQUE,
+      role TEXT
     )`);
   });
 }
@@ -35,7 +36,7 @@ function getAllThreads(callback) {
     if (err) return callback(err);
     const threadIds = threads.map(t => t.id);
     if (threadIds.length === 0) return callback(null, []);
-    db.all('SELECT * FROM comments WHERE thread_id IN (' + threadIds.map(() => '?').join(',') + ')', threadIds, (err, comments) => {
+    db.all('SELECT comments.*, users.role FROM comments LEFT JOIN users ON comments.user = users.username WHERE thread_id IN (' + threadIds.map(() => '?').join(',') + ')', threadIds, (err, comments) => {
       if (err) return callback(err);
       // Group comments by thread_id
       const commentsByThread = {};
@@ -96,15 +97,15 @@ function getUserByGoogleId(google_id, callback) {
 
 // Create user with Google ID
 function createUserWithGoogleId(google_id, callback) {
-  db.run('INSERT INTO users (google_id) VALUES (?)', [google_id], function(err) {
+  db.run('INSERT INTO users (google_id, role) VALUES (?, ?)', [google_id, null], function(err) {
     if (err) return callback(err);
     callback(null, { id: this.lastID, google_id });
   });
 }
 
 // Set username for user
-function setUsernameForUser(user_id, username, callback) {
-  db.run('UPDATE users SET username = ? WHERE id = ?', [username, user_id], function(err) {
+function setUsernameForUser(user_id, username, role, callback) {
+  db.run('UPDATE users SET username = ?, role = ? WHERE id = ?', [username, role, user_id], function(err) {
     if (err) return callback(err);
     callback(null);
   });

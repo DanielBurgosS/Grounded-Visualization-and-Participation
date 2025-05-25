@@ -144,9 +144,10 @@ app.get('/api/whoami', (req, res) => {
 
 app.post('/api/set-username', (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Not logged in' });
-  const { username } = req.body;
+  const { username, role } = req.body;
   if (!username) return res.status(400).json({ error: 'Username required' });
-  db.setUsernameForUser(req.user.id, username, (err) => {
+  if (!role) return res.status(400).json({ error: 'Role required' });
+  db.setUsernameForUser(req.user.id, username, role, (err) => {
     if (err) {
       if (err.message && err.message.includes('UNIQUE')) {
         return res.status(409).json({ error: 'Username already taken' });
@@ -155,8 +156,9 @@ app.post('/api/set-username', (req, res) => {
     }
     // Update user in session and req.user
     req.user.username = username;
+    req.user.role = role;
     req.session.passport.user = req.user.id;
-    res.json({ success: true, username });
+    res.json({ success: true, username, role });
   });
 });
 

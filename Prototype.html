@@ -172,6 +172,11 @@
     <div style="background:#fff;padding:32px 24px;border-radius:8px;box-shadow:0 2px 16px rgba(0,0,0,0.2);min-width:300px;display:flex;flex-direction:column;align-items:center;">
       <h2>Choose a Username</h2>
       <input id="username-input" type="text" placeholder="Enter username" style="font-size:1.2em;padding:8px;width:90%;margin-bottom:12px;" />
+      <select id="role-select" style="font-size:1.1em;padding:8px 24px;margin-bottom:12px;">
+        <option value="Municipality Official">Municipality Official</option>
+        <option value="Private company">Private company</option>
+        <option value="Friendly neighbour">Friendly neighbour</option>
+      </select>
       <button id="username-submit-btn" style="font-size:1.1em;padding:8px 24px;">Save Username</button>
       <div id="username-error" style="color:red;margin-top:10px;"></div>
     </div>
@@ -180,7 +185,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // Backend API base URL
-    const API_BASE = 'http://smatiiihost.ddns.net/api';
+    const API_BASE = '/api';
 
     // Initialize the map
     const map = L.map('map').setView([52.263, 6.155], 16);
@@ -266,7 +271,7 @@
         thread.comments.forEach((comment) => {
           commentsHtml += `
             <div class="comment-item">
-              <div class="comment-user">${comment.user} - ${comment.timestamp}</div>
+              <div class="comment-user">${comment.user} <span style='color:#888;font-size:12px;'>(${comment.role || 'Unknown'})</span> - ${comment.timestamp}</div>
               <p class="comment-text">${comment.text}</p>
               <div class="reaction-buttons">
                 <button class="reaction-btn" onclick="handleReaction(${comment.id}, 'likes', event, ${thread.id})">
@@ -317,7 +322,7 @@
         if (thread.comments && thread.comments.length > 0) {
           commentsHtml = `<div class='sidebar-comment-list'>`;
           thread.comments.forEach(comment => {
-            commentsHtml += `<div class='sidebar-comment-item'><b>${comment.user}:</b> ${comment.text}</div>`;
+            commentsHtml += `<div class='sidebar-comment-item'><b>${comment.user} <span style='color:#888;font-size:12px;'>(${comment.role || 'Unknown'})</span>:</b> ${comment.text}</div>`;
           });
           commentsHtml += `</div>`;
         }
@@ -552,16 +557,17 @@
     // Handle username submission
     document.getElementById('username-submit-btn').onclick = async function() {
       const username = document.getElementById('username-input').value.trim();
+      const role = document.getElementById('role-select').value;
       if (!username) {
         document.getElementById('username-error').innerText = 'Username required';
         return;
       }
-      // Save username to backend
+      // Save username and role to backend
       const res = await fetch('/api/set-username', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ username })
+        body: JSON.stringify({ username, role })
       });
       if (res.ok) {
         hideUsernameModal();
