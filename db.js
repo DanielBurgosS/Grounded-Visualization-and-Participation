@@ -119,6 +119,13 @@ function getUserById(id, callback) {
   });
 }
 
+function deleteUserByUsername(username, callback) {
+  db.run('DELETE FROM users WHERE username = ?', [username], function(err) {
+    if (err) return callback(err);
+    callback(null);
+  });
+}
+
 module.exports = {
   initDB,
   getAllThreads,
@@ -129,5 +136,6 @@ module.exports = {
   getUserByGoogleId,
   createUserWithGoogleId,
   setUsernameForUser,
-  getUserById
+  getUserById,
+  deleteUserByUsername
 }; 

@@ -293,10 +293,11 @@
           <span style='color: #888;'>Thread ID: ${thread.id}</span><br>
           <textarea id="comment-${thread.id}" placeholder="Type your comment..."></textarea><br>
           <button onclick="submitComment(${thread.id}, event)">Submit Comment</button>
-          <button style='margin-left:10px;color:red;' onclick="deleteThread(${thread.id})">Delete Thread</button>
         </div>
         ${commentsHtml}
       `;
+      //          <button style='margin-left:10px;color:red;' onclick="deleteThread(${thread.id})">Delete Thread</button>
+
     }
 
     // On page load, fetch all threads and add markers
