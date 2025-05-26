@@ -313,12 +313,52 @@
     // Render the sidebar with all threads and comments
     function renderSidebar(threads) {
       const sidebar = document.getElementById('sidebar');
+      // Add filter dropdown
+      if (!document.getElementById('thread-role-filter')) {
+        const filterDiv = document.createElement('div');
+        filterDiv.style = 'padding: 12px 16px 8px 16px; border-bottom: 1px solid #eee; background: #fafafa;';
+        filterDiv.innerHTML = `
+          <label for="thread-role-filter" style="font-weight:bold;">Show threads from: </label>
+          <select id="thread-role-filter" style="margin-left:8px;">
+            <option value="All">All</option>
+            <option value="Municipality Official">Municipality Official</option>
+            <option value="Private company">Private company</option>
+            <option value="Friendly neighbour">Friendly neighbour</option>
+          </select>
+        `;
+        sidebar.appendChild(filterDiv);
+      }
+      const selectedRole = document.getElementById('thread-role-filter')?.value || 'All';
       sidebar.innerHTML = `<div style="font-size:18px;font-weight:bold;padding:16px 16px 8px 16px;border-bottom:1px solid #eee;">Threads</div>`;
-      if (threads.length === 0) {
+      // Re-add filter dropdown after clearing innerHTML
+      sidebar.innerHTML += `
+        <div style='padding: 12px 16px 8px 16px; border-bottom: 1px solid #eee; background: #fafafa;'>
+          <label for="thread-role-filter" style="font-weight:bold;">Show threads from: </label>
+          <select id="thread-role-filter" style="margin-left:8px;">
+            <option value="All">All</option>
+            <option value="Municipality Official">Municipality Official</option>
+            <option value="Private company">Private company</option>
+            <option value="Friendly neighbour">Friendly neighbour</option>
+          </select>
+        </div>
+      `;
+      // Set the filter value
+      setTimeout(() => {
+        document.getElementById('thread-role-filter').value = selectedRole;
+        document.getElementById('thread-role-filter').onchange = () => renderSidebar(threads);
+      }, 0);
+      // Filter threads
+      let filteredThreads = threads;
+      if (selectedRole !== 'All') {
+        filteredThreads = threads.filter(thread =>
+          thread.comments && thread.comments.some(comment => comment.role === selectedRole)
+        );
+      }
+      if (filteredThreads.length === 0) {
         sidebar.innerHTML += `<div style='padding:16px;color:#888;'>No threads yet.</div>`;
         return;
       }
-      threads.forEach(thread => {
+      filteredThreads.forEach(thread => {
         let commentsHtml = '';
         if (thread.comments && thread.comments.length > 0) {
           commentsHtml = `<div class='sidebar-comment-list'>`;
@@ -331,7 +371,6 @@
           <div class='sidebar-thread' data-thread-id='${thread.id}'>
             <span class='sidebar-thread-title'>Thread at ${thread.lat.toFixed(4)}, ${thread.lng.toFixed(4)}</span><br>
             <span class='sidebar-thread-id'>ID: ${thread.id}</span>
-            <button class='sidebar-delete-btn' style='float:right;margin-top:-22px;margin-right:-8px;color:red;background:none;border:none;font-size:16px;cursor:pointer;' title='Delete Thread' onclick='event.stopPropagation(); deleteThread(${thread.id});'>&#128465;</button>
             ${commentsHtml}
           </div>
         `;
