@@ -58,6 +58,7 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser((id, done) => {
   db.getUserById(id, (err, user) => {
     if (err) return done(err);
+    if (!user) return done(null, false); // User not found, invalidate session
     done(null, user);
   });
 });
