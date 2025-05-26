@@ -126,6 +126,33 @@ function deleteUserByUsername(username, callback) {
   });
 }
 
+function deleteThreadsByUser(username, callback) {
+  // Find all thread IDs where this user has posted a comment
+  db.all('SELECT DISTINCT thread_id FROM comments WHERE user = ?', [username], (err, rows) => {
+    if (err) return callback(err);
+    const threadIds = rows.map(r => r.thread_id);
+    if (threadIds.length === 0) return callback(null, 0);
+    let deleted = 0;
+    let errors = [];
+    let toDelete = threadIds.length;
+    threadIds.forEach(threadId => {
+      db.serialize(() => {
+        db.run('DELETE FROM comments WHERE thread_id = ?', [threadId], function(err) {
+          if (err) errors.push(err);
+          db.run('DELETE FROM threads WHERE id = ?', [threadId], function(err2) {
+            if (err2) errors.push(err2);
+            deleted++;
+            if (--toDelete === 0) {
+              if (errors.length > 0) return callback(errors);
+              callback(null, deleted);
+            }
+          });
+        });
+      });
+    });
+  });
+}
+
 module.exports = {
   initDB,
   getAllThreads,
@@ -137,5 +164,6 @@ module.exports = {
   createUserWithGoogleId,
   setUsernameForUser,
   getUserById,
-  deleteUserByUsername
+  deleteUserByUsername,
+  deleteThreadsByUser
 }; 

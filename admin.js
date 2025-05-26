@@ -12,15 +12,30 @@ if (command === 'delete-thread') {
     process.exit();
   });
 } else if (command === 'delete-user') {
-  db.deleteUserByUsername(arg, (err) => {
+  db.deleteThreadsByUser(arg, (err) => {
     if (err) {
-      console.error('Error deleting user:', err);
+      console.error('Error deleting threads by user:', err);
+      process.exit();
+    }
+    db.deleteUserByUsername(arg, (err) => {
+      if (err) {
+        console.error('Error deleting user:', err);
+      } else {
+        console.log('User and their threads deleted:', arg);
+      }
+      process.exit();
+    });
+  });
+} else if (command === 'delete-threads-by-user') {
+  db.deleteThreadsByUser(arg, (err, count) => {
+    if (err) {
+      console.error('Error deleting threads by user:', err);
     } else {
-      console.log('User deleted:', arg);
+      console.log('Threads deleted for user', arg + ':', count);
     }
     process.exit();
   });
 } else {
-  console.log('Usage: node admin.js delete-thread <id> | delete-user <username>');
+  console.log('Usage: node admin.js delete-thread <id> | delete-user <username> | delete-threads-by-user <username>');
   process.exit();
 } 
