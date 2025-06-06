@@ -164,8 +164,6 @@
     </select>
   </div>
   
-//thoughts and prayers
-
   <div id="map"></div>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -214,18 +212,47 @@
       }),
     };
 
-    // Add the default layer
-    let currentLayer = tileLayers['osm'];
-    currentLayer.addTo(map);
+    // Add the default base layer
+    let baseLayers = {
+      'osm': tileLayers['osm'],
+      'topo': tileLayers['topo'],
+      'carto': tileLayers['carto'],
+      'toner': tileLayers['toner'],
+      'satellite': tileLayers['satellite'],
+    };
+    let featureLayers = {
+      'geomorph': tileLayers['geomorph'],
+      'breakins': tileLayers['breakins'],
+      'sewage': tileLayers['sewage'],
+      'misdemeanor': tileLayers['misdemeanor'],
+    };
+    let currentBaseLayer = baseLayers['osm'];
+    let currentFeatureLayer = null;
+    currentBaseLayer.addTo(map);
 
     // Handle map style dropdown change
     document.getElementById('map-style').addEventListener('change', function(e) {
-      if (currentLayer) {
-        map.removeLayer(currentLayer);
-      }
       const selected = e.target.value;
-      currentLayer = tileLayers[selected];
-      currentLayer.addTo(map);
+      // If selected is a base layer
+      if (baseLayers[selected]) {
+        if (currentBaseLayer) {
+          map.removeLayer(currentBaseLayer);
+        }
+        currentBaseLayer = baseLayers[selected];
+        currentBaseLayer.addTo(map);
+        // Remove any feature overlay
+        if (currentFeatureLayer) {
+          map.removeLayer(currentFeatureLayer);
+          currentFeatureLayer = null;
+        }
+      } else if (featureLayers[selected]) {
+        // Always keep the base layer, just add overlay
+        if (currentFeatureLayer) {
+          map.removeLayer(currentFeatureLayer);
+        }
+        currentFeatureLayer = featureLayers[selected];
+        currentFeatureLayer.addTo(map);
+      }
     });
 
     // Store for all markers by thread id
