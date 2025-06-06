@@ -169,6 +169,7 @@
   <div id="map"></div>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet"></script>
   <script>
     // Backend API base URL
     const API_BASE = '/api';
@@ -194,16 +195,21 @@
       'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles © Esri'
       }),
-      'geomorph': L.tileLayer('https://www.arcgis.com/apps/mapviewer/index.html?url=https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Geomorfologie_reduced/FeatureServer&source=sd', {
+      // Esri Feature Layers below:
+      'geomorph': L.esri.featureLayer({
+        url: 'https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Geomorfologie_reduced/FeatureServer/0',
         attribution: 'Tiles © Esri, EsriNL, Rijkswaterstaat, Intermap, NASA, NGA, USGS | Land NRW, Kadaster, Esri, TomTom, Garmin, GeoTechnologies, Inc, METI/NASA, USGS'
       }),
-      'breakins': L.tileLayer('https://www.staatvandeventer.nl/leefomgeving/woninginbraken', {
+      'breakins': L.esri.featureLayer({
+        url: 'https://www.staatvandeventer.nl/arcgis/rest/services/woninginbraken/FeatureServer/0',
         attribution: '© 2025 Google'
       }),
-      'sewage': L.tileLayer('https://www.arcgis.com/apps/mapviewer/index.html?url=https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Riool_leidingen_openbaar/FeatureServer&source=sd', {
+      'sewage': L.esri.featureLayer({
+        url: 'https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Riool_leidingen_openbaar/FeatureServer/0',
         attribution: '© Esri, EsriNL, Rijkswaterstaat, Intermap, NASA, NGA, USGS | Land NRW, Kadaster, Esri, TomTom, Garmin, GeoTechnologies, Inc, METI/NASA, USGS'
       }),
-      'misdemeanor': L.tileLayer('https://www.staatvandeventer.nl/veiligheid-en-bestuur/misdrijven', {
+      'misdemeanor': L.esri.featureLayer({
+        url: 'https://www.staatvandeventer.nl/arcgis/rest/services/misdrijven/FeatureServer/0',
         attribution: '© 2025 Google'
       }),
     };
@@ -214,7 +220,9 @@
 
     // Handle map style dropdown change
     document.getElementById('map-style').addEventListener('change', function(e) {
-      map.removeLayer(currentLayer);
+      if (currentLayer) {
+        map.removeLayer(currentLayer);
+      }
       const selected = e.target.value;
       currentLayer = tileLayers[selected];
       currentLayer.addTo(map);
