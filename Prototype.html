@@ -134,7 +134,7 @@
     .map-controls {
       position: absolute;
       top: 10px;
-      left: 40px;
+      left: 10px;
       z-index: 1000;
       background: white;
       padding: 10px;
@@ -148,39 +148,23 @@
   </style>
 </head>
 <body>
-  <div id="start-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;">
-    <h1>3S Neighbourhood Viewer</h1>
-    <button id="google-login-btn" style="font-size:1.5em;padding:16px 32px;cursor:pointer;">Log in with Google</button>
-  </div>
-  <div id="sidebar" class="collapsed" style="display:none;"></div>
-  <button id="sidebar-toggle" style="display:none;">⮞</button>
-  <div class="map-controls" style="display:none;">
+  <div id="sidebar" class="collapsed"></div>
+  <button id="sidebar-toggle">⮞</button>
+  <div class="map-controls">
     <select id="map-style">
       <option value="osm">OpenStreetMap</option>
       <option value="topo">OpenTopoMap</option>
       <option value="carto">CartoDB Positron</option>
       <option value="toner">Stamen Toner</option>
       <option value="satellite">Esri Satellite</option>
+      <option value="geomorph">Esri Geomorphic Map</option>
+      <option value="breakins">Google Breakins</option>
+      <option value="sewage">Esri Sewage</option>
+      <option value="misdemeanor">Google Misdemeanor</option>
     </select>
   </div>
-  <div id="map" style="display:none;"></div>
-  <button id="logout-btn" style="position:fixed;bottom:20px;left:20px;z-index:2100;display:none;">
-    <span id="current-username" style="font-weight:bold;margin-right:12px;"></span>
-    Logout
-  </button>
-  <div id="username-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);z-index:3000;align-items:center;justify-content:center;">
-    <div style="background:#fff;padding:32px 24px;border-radius:8px;box-shadow:0 2px 16px rgba(0,0,0,0.2);min-width:300px;display:flex;flex-direction:column;align-items:center;">
-      <h2>Choose a Username</h2>
-      <input id="username-input" type="text" placeholder="Enter username" style="font-size:1.2em;padding:8px;width:90%;margin-bottom:12px;" />
-      <select id="role-select" style="font-size:1.1em;padding:8px 24px;margin-bottom:12px;">
-        <option value="Municipality Official">Municipality Official</option>
-        <option value="Private company">Private company</option>
-        <option value="Friendly neighbour">Friendly neighbour</option>
-      </select>
-      <button id="username-submit-btn" style="font-size:1.1em;padding:8px 24px;">Save Username</button>
-      <div id="username-error" style="color:red;margin-top:10px;"></div>
-    </div>
-  </div>
+  
+  <div id="map"></div>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
@@ -207,7 +191,19 @@
       }),
       'satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles © Esri'
-      })
+      }),
+      'geomorph': L.tileLayer('https://www.arcgis.com/apps/mapviewer/index.html?url=https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Geomorfologie_reduced/FeatureServer&source=sd', {
+        attribution: 'Tiles © Esri, EsriNL, Rijkswaterstaat, Intermap, NASA, NGA, USGS | Land NRW, Kadaster, Esri, TomTom, Garmin, GeoTechnologies, Inc, METI/NASA, USGS'
+      }),
+      'breakins': L.tileLayer('https://www.staatvandeventer.nl/leefomgeving/woninginbraken', {
+        attribution: '© 2025 Google'
+      }),
+      'sewage': L.tileLayer('https://www.arcgis.com/apps/mapviewer/index.html?url=https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Riool_leidingen_openbaar/FeatureServer&source=sd', {
+        attribution: '© Esri, EsriNL, Rijkswaterstaat, Intermap, NASA, NGA, USGS | Land NRW, Kadaster, Esri, TomTom, Garmin, GeoTechnologies, Inc, METI/NASA, USGS'
+      }),
+      'misdemeanor': L.tileLayer('https://www.staatvandeventer.nl/veiligheid-en-bestuur/misdrijven', {
+        attribution: '© 2025 Google'
+      }),
     };
 
     // Add the default layer
@@ -225,31 +221,10 @@
     // Store for all markers by thread id
     const markersById = {};
     let userCounter = 1;
-    let currentUsername = null;
 
     // Add a marker for a thread
     function addThreadMarker(thread) {
-      // Determine role from first comment
-      let role = null;
-      if (thread.comments && thread.comments.length > 0) {
-        role = thread.comments[0].role;
-      }
-      // Set marker icon based on role
-      let iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png'; // default blue
-      if (role === 'Municipality Official') {
-        iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png';
-      } else if (role === 'Friendly neighbour') {
-        iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png';
-      }
-      const markerIcon = L.icon({
-        iconUrl: iconUrl,
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
-      });
-      const marker = L.marker([thread.lat, thread.lng], { icon: markerIcon }).addTo(map);
+      const marker = L.marker([thread.lat, thread.lng]).addTo(map);
       markersById[thread.id] = marker;
       marker.bindPopup(createPopupContent(thread), { autoClose: false, closeOnClick: false });
       let popupHovered = false;
@@ -291,7 +266,7 @@
         thread.comments.forEach((comment) => {
           commentsHtml += `
             <div class="comment-item">
-              <div class="comment-user">${comment.user} <span style='color:#888;font-size:12px;'>(${comment.role || 'Unknown'})</span> - ${comment.timestamp}</div>
+              <div class="comment-user">${comment.user} - ${comment.timestamp}</div>
               <p class="comment-text">${comment.text}</p>
               <div class="reaction-buttons">
                 <button class="reaction-btn" onclick="handleReaction(${comment.id}, 'likes', event, ${thread.id})">
@@ -313,11 +288,10 @@
           <span style='color: #888;'>Thread ID: ${thread.id}</span><br>
           <textarea id="comment-${thread.id}" placeholder="Type your comment..."></textarea><br>
           <button onclick="submitComment(${thread.id}, event)">Submit Comment</button>
+          <button style='margin-left:10px;color:red;' onclick="deleteThread(${thread.id})">Delete Thread</button>
         </div>
         ${commentsHtml}
       `;
-      //          <button style='margin-left:10px;color:red;' onclick="deleteThread(${thread.id})">Delete Thread</button>
-
     }
 
     // On page load, fetch all threads and add markers
@@ -333,57 +307,17 @@
     // Render the sidebar with all threads and comments
     function renderSidebar(threads) {
       const sidebar = document.getElementById('sidebar');
-      // Add filter dropdown
-      if (!document.getElementById('thread-role-filter')) {
-        const filterDiv = document.createElement('div');
-        filterDiv.style = 'padding: 12px 16px 8px 16px; border-bottom: 1px solid #eee; background: #fafafa;';
-        filterDiv.innerHTML = `
-          <label for="thread-role-filter" style="font-weight:bold;">Show threads from: </label>
-          <select id="thread-role-filter" style="margin-left:8px;">
-            <option value="All">All</option>
-            <option value="Municipality Official">Municipality Official</option>
-            <option value="Private company">Private company</option>
-            <option value="Friendly neighbour">Friendly neighbour</option>
-          </select>
-        `;
-        sidebar.appendChild(filterDiv);
-      }
-      const selectedRole = document.getElementById('thread-role-filter')?.value || 'All';
       sidebar.innerHTML = `<div style="font-size:18px;font-weight:bold;padding:16px 16px 8px 16px;border-bottom:1px solid #eee;">Threads</div>`;
-      // Re-add filter dropdown after clearing innerHTML
-      sidebar.innerHTML += `
-        <div style='padding: 12px 16px 8px 16px; border-bottom: 1px solid #eee; background: #fafafa;'>
-          <label for="thread-role-filter" style="font-weight:bold;">Show threads from: </label>
-          <select id="thread-role-filter" style="margin-left:8px;">
-            <option value="All">All</option>
-            <option value="Municipality Official">Municipality Official</option>
-            <option value="Private company">Private company</option>
-            <option value="Friendly neighbour">Friendly neighbour</option>
-          </select>
-        </div>
-      `;
-      // Set the filter value
-      setTimeout(() => {
-        document.getElementById('thread-role-filter').value = selectedRole;
-        document.getElementById('thread-role-filter').onchange = () => renderSidebar(threads);
-      }, 0);
-      // Filter threads
-      let filteredThreads = threads;
-      if (selectedRole !== 'All') {
-        filteredThreads = threads.filter(thread =>
-          thread.comments && thread.comments.some(comment => comment.role === selectedRole)
-        );
-      }
-      if (filteredThreads.length === 0) {
+      if (threads.length === 0) {
         sidebar.innerHTML += `<div style='padding:16px;color:#888;'>No threads yet.</div>`;
         return;
       }
-      filteredThreads.forEach(thread => {
+      threads.forEach(thread => {
         let commentsHtml = '';
         if (thread.comments && thread.comments.length > 0) {
           commentsHtml = `<div class='sidebar-comment-list'>`;
           thread.comments.forEach(comment => {
-            commentsHtml += `<div class='sidebar-comment-item'><b>${comment.user} <span style='color:#888;font-size:12px;'>(${comment.role || 'Unknown'})</span>:</b> ${comment.text}</div>`;
+            commentsHtml += `<div class='sidebar-comment-item'><b>${comment.user}:</b> ${comment.text}</div>`;
           });
           commentsHtml += `</div>`;
         }
@@ -391,6 +325,7 @@
           <div class='sidebar-thread' data-thread-id='${thread.id}'>
             <span class='sidebar-thread-title'>Thread at ${thread.lat.toFixed(4)}, ${thread.lng.toFixed(4)}</span><br>
             <span class='sidebar-thread-id'>ID: ${thread.id}</span>
+            <button class='sidebar-delete-btn' style='float:right;margin-top:-22px;margin-right:-8px;color:red;background:none;border:none;font-size:16px;cursor:pointer;' title='Delete Thread' onclick='event.stopPropagation(); deleteThread(${thread.id});'>&#128465;</button>
             ${commentsHtml}
           </div>
         `;
@@ -448,7 +383,7 @@
       });
       const thread = await res.json();
       // Add first comment
-      const user = currentUsername;
+      const user = `User ${userCounter++}`;
       const timestamp = new Date().toLocaleString();
       await fetch(`${API_BASE}/comments`, {
         method: 'POST',
@@ -475,7 +410,7 @@
       const textarea = document.getElementById(`comment-${threadId}`);
       const text = textarea.value.trim();
       if (text) {
-        const user = currentUsername;
+        const user = `User ${userCounter++}`;
         const timestamp = new Date().toLocaleString();
         await fetch(`${API_BASE}/comments`, {
           method: 'POST',
@@ -551,99 +486,8 @@
         .openOn(map);
     });
 
-    // Check login state and show appropriate page
-    async function checkLogin() {
-      try {
-        const res = await fetch('/api/whoami', { credentials: 'include' });
-        const data = await res.json();
-        if (data.user) {
-          if (!data.user.username) {
-            showUsernameModal();
-          } else {
-            currentUsername = data.user.username;
-            showApp();
-          }
-        } else {
-          currentUsername = null;
-          showStartPage();
-        }
-      } catch (e) {
-        currentUsername = null;
-        showStartPage();
-      }
-    }
-
-    function showStartPage() {
-      document.getElementById('start-page').style.display = 'flex';
-      document.getElementById('sidebar').style.display = 'none';
-      document.getElementById('sidebar-toggle').style.display = 'none';
-      document.querySelector('.map-controls').style.display = 'none';
-      document.getElementById('map').style.display = 'none';
-      document.getElementById('logout-btn').style.display = 'none';
-    }
-    function showApp() {
-      document.getElementById('start-page').style.display = 'none';
-      document.getElementById('sidebar').style.display = '';
-      document.getElementById('sidebar-toggle').style.display = '';
-      document.querySelector('.map-controls').style.display = '';
-      document.getElementById('map').style.display = '';
-      document.getElementById('logout-btn').style.display = '';
-      document.getElementById('current-username').innerText = currentUsername ? currentUsername : '';
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 0);
-      loadThreads();
-    }
-
-    document.getElementById('google-login-btn').onclick = function() {
-      window.location.href = '/auth/google';
-    };
-
-    // On page load, check login state
-    checkLogin();
-
-    // Show the username modal
-    function showUsernameModal() {
-      document.getElementById('username-modal').style.display = 'flex';
-      document.getElementById('username-input').value = '';
-      document.getElementById('username-error').innerText = '';
-    }
-
-    // Hide the username modal
-    function hideUsernameModal() {
-      document.getElementById('username-modal').style.display = 'none';
-    }
-
-    // Handle username submission
-    document.getElementById('username-submit-btn').onclick = async function() {
-      const username = document.getElementById('username-input').value.trim();
-      const role = document.getElementById('role-select').value;
-      if (!username) {
-        document.getElementById('username-error').innerText = 'Username required';
-        return;
-      }
-      // Save username and role to backend
-      const res = await fetch('/api/set-username', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, role })
-      });
-      if (res.ok) {
-        hideUsernameModal();
-        currentUsername = username;
-        showApp();
-      } else {
-        const data = await res.json();
-        document.getElementById('username-error').innerText = data.error || 'Error saving username';
-      }
-    };
-
-    document.getElementById('logout-btn').onclick = async function() {
-      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-      currentUsername = null;
-      window.location.reload();
-    };
+    // Load all threads on page load
+    loadThreads();
   </script>
 </body>
 </html>
