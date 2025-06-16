@@ -1,49 +1,17 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const fs = require('fs');
 
 const dbFile = path.join(__dirname, 'threads.db');
-console.log('Database file path:', dbFile);
-
-// Check if directory exists and is writable
-const dbDir = path.dirname(dbFile);
-if (!fs.existsSync(dbDir)) {
-  console.log('Creating database directory:', dbDir);
-  fs.mkdirSync(dbDir, { recursive: true });
-}
-
-// Check if we can write to the directory
-try {
-  fs.accessSync(dbDir, fs.constants.W_OK);
-  console.log('Directory is writable');
-} catch (err) {
-  console.error('Cannot write to directory:', err);
-}
-
-const db = new sqlite3.Database(dbFile, (err) => {
-  if (err) {
-    console.error('Error opening database:', err);
-  } else {
-    console.log('Connected to the SQLite database.');
-  }
-});
+const db = new sqlite3.Database(dbFile);
 
 // Initialize tables if they don't exist
 function initDB() {
-  console.log('Initializing database...');
   db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS threads (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lat REAL NOT NULL,
       lng REAL NOT NULL
-    )`, (err) => {
-      if (err) {
-        console.error('Error creating threads table:', err);
-      } else {
-        console.log('Threads table created or already exists');
-      }
-    });
-
+    )`);
     db.run(`CREATE TABLE IF NOT EXISTS comments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       thread_id INTEGER NOT NULL,
@@ -53,26 +21,13 @@ function initDB() {
       likes INTEGER DEFAULT 0,
       dislikes INTEGER DEFAULT 0,
       FOREIGN KEY(thread_id) REFERENCES threads(id)
-    )`, (err) => {
-      if (err) {
-        console.error('Error creating comments table:', err);
-      } else {
-        console.log('Comments table created or already exists');
-      }
-    });
-
+    )`);
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       google_id TEXT UNIQUE,
       username TEXT UNIQUE,
       role TEXT
-    )`, (err) => {
-      if (err) {
-        console.error('Error creating users table:', err);
-      } else {
-        console.log('Users table created or already exists');
-      }
-    });
+    )`);
   });
 }
 
