@@ -161,6 +161,8 @@
       <option value="carto">CartoDB Positron</option>
       <option value="toner">Stamen Toner</option>
       <option value="satellite">Esri Satellite</option>
+      <option value="geomorph">Esri Geomorphic Map</option>
+      <option value="sewage">Esri Sewage</option>
     </select>
   </div>
   <div id="map" style="display:none;"></div>
@@ -183,6 +185,7 @@
   </div>
   
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet"></script>
   <script>
     // Backend API base URL
     const API_BASE = '/api';
@@ -210,16 +213,47 @@
       })
     };
 
-    // Add the default layer
-    let currentLayer = tileLayers['osm'];
-    currentLayer.addTo(map);
+    // Define feature layers
+    let featureLayers = {
+      'geomorph': L.esri.featureLayer({
+        url: 'https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Geomorfologie_reduced/FeatureServer/0',
+        attribution: 'Tiles © Esri, EsriNL, Rijkswaterstaat, Intermap, NASA, NGA, USGS | Land NRW, Kadaster, Esri, TomTom, Garmin, GeoTechnologies, Inc, METI/NASA, USGS'
+      }),
+      'sewage': L.esri.featureLayer({
+        url: 'https://services3.arcgis.com/vIFGkPPowfxZWvaV/ArcGIS/rest/services/Riool_leidingen_openbaar/FeatureServer/0',
+        attribution: '© Esri, EsriNL, Rijkswaterstaat, Intermap, NASA, NGA, USGS | Land NRW, Kadaster, Esri, TomTom, Garmin, GeoTechnologies, Inc, METI/NASA, USGS'
+      })
+    };
+
+    // Add the default base layer
+    let currentBaseLayer = tileLayers['osm'];
+    let currentFeatureLayer = null;
+    currentBaseLayer.addTo(map);
 
     // Handle map style dropdown change
     document.getElementById('map-style').addEventListener('change', function(e) {
-      map.removeLayer(currentLayer);
       const selected = e.target.value;
-      currentLayer = tileLayers[selected];
-      currentLayer.addTo(map);
+      
+      // If selected is a base layer
+      if (tileLayers[selected]) {
+        if (currentBaseLayer) {
+          map.removeLayer(currentBaseLayer);
+        }
+        currentBaseLayer = tileLayers[selected];
+        currentBaseLayer.addTo(map);
+        // Remove any feature overlay
+        if (currentFeatureLayer) {
+          map.removeLayer(currentFeatureLayer);
+          currentFeatureLayer = null;
+        }
+      } else if (featureLayers[selected]) {
+        // Always keep the base layer, just add overlay
+        if (currentFeatureLayer) {
+          map.removeLayer(currentFeatureLayer);
+        }
+        currentFeatureLayer = featureLayers[selected];
+        currentFeatureLayer.addTo(map);
+      }
     });
 
     // Store for all markers by thread id
