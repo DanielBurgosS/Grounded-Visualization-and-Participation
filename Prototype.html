@@ -190,6 +190,20 @@
     // Backend API base URL
     const API_BASE = '/api';
 
+    // Initialize database if it doesn't exist
+    async function initializeDatabase() {
+      try {
+        const response = await fetch(`${API_BASE}/init-db`, {
+          method: 'POST'
+        });
+        if (!response.ok) {
+          console.error('Failed to initialize database');
+        }
+      } catch (error) {
+        console.error('Error initializing database:', error);
+      }
+    }
+
     // Initialize the map
     const map = L.map('map').setView([52.263, 6.155], 16);
     
@@ -678,6 +692,11 @@
       currentUsername = null;
       window.location.reload();
     };
+
+    // Load all threads on page load
+    initializeDatabase().then(() => {
+      loadThreads();
+    });
   </script>
 </body>
 </html>
